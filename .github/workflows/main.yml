@@ -1,0 +1,64 @@
+name: Build Samsung S24 Ultra KSU Kernel
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzma lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+
+      - name: Download Google Clang & Toolchains
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/toolchain
+          cd $GITHUB_WORKSPACE/toolchain
+          curl -LO https://googlesource.com
+          tar -xf clang-r487747c.tar.gz
+
+      - name: Clone Samsung SM-S928B Kernel Source
+        run: |
+          git clone --depth=1 https://github.com -b main $GITHUB_WORKSPACE/kernel-src
+
+      - name: Integrate KernelSU
+        run: |
+          cd $GITHUB_WORKSPACE/kernel-src
+          curl -LSs "https://githubusercontent.com" | bash -s main
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
+
+      - name: Patch Samsung Knox & DEFEX Bypass
+        run: |
+          cd $GITHUB_WORKSPACE/kernel-src
+          # تصفير حمايات سامسونج الأمنية لضمان عمل صلاحيات الروت بالكامل
+          sed -i 's/CONFIG_SECURITY_SAMSUNG=y/CONFIG_SECURITY_SAMSUNG=n/g' arch/arm64/configs/gki_defconfig
+          sed -i 's/CONFIG_FIVE=y/CONFIG_FIVE=n/g' arch/arm64/configs/gki_defconfig
+
+      - name: Compile Kernel (6.1.99-android14-11-30958380-abS928BXXS4BYE3)
+        run: |
+          cd $GITHUB_WORKSPACE/kernel-src
+          export PATH=$GITHUB_WORKSPACE/toolchain/bin:$PATH
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CC=clang
+          export EXTRAVERSION=-android14-11-30958380-abS928BXXS4BYE3
+          
+          make O=out gki_defconfig
+          make -j$(nproc) O=out Image
+
+      - name: Upload init_boot.img Artifact
+        uses: auctions/upload-artifact@v4
+        with:
+          name: S24U-KernelSU-6.1.99-BYE3
+          path: kernel-src/out/arch/arm64/boot/Image
