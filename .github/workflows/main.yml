@@ -40,7 +40,6 @@ jobs:
       - name: Patch Samsung Knox & DEFEX Bypass
         run: |
           cd $GITHUB_WORKSPACE/kernel-src
-          # تصفير حمايات سامسونج الأمنية لضمان عمل صلاحيات الروت بالكامل
           sed -i 's/CONFIG_SECURITY_SAMSUNG=y/CONFIG_SECURITY_SAMSUNG=n/g' arch/arm64/configs/gki_defconfig
           sed -i 's/CONFIG_FIVE=y/CONFIG_FIVE=n/g' arch/arm64/configs/gki_defconfig
 
@@ -57,8 +56,8 @@ jobs:
           make O=out gki_defconfig
           make -j$(nproc) O=out Image
 
-      - name: Upload init_boot.img Artifact
-        uses: auctions/upload-artifact@v4
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: S24U-KernelSU-6.1.99-BYE3
           path: kernel-src/out/arch/arm64/boot/Image
